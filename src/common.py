@@ -59,7 +59,7 @@ def parse_bbox_file(bbox_path: str) -> dict:
     """
     bbox_map = {}
     with open(bbox_path) as f:
-        lines = [l.strip() for l in f if l.strip()]
+        lines = [ln.strip() for ln in f if ln.strip()]
     for line in lines[2:]:  # line 0 = count, line 1 = header
         parts = line.split()
         if len(parts) < 7:

@@ -70,10 +70,10 @@ def main():
           f"(max allowed={rg['max_allowed_drop']})")
 
     if drop > rg["max_allowed_drop"]:
-        print(f"[regression_gate] FAIL — regression exceeds threshold.")
+        print("[regression_gate] FAIL — regression exceeds threshold.")
         sys.exit(1)
 
-    print(f"[regression_gate] PASS.")
+    print("[regression_gate] PASS.")
     sys.exit(0)
 
 

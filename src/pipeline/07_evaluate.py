@@ -100,7 +100,7 @@ def evaluate_index(config_name, index, query_data, metadata, clip_model, clip_pr
 
             search_k = max(k_values) * 5
             labels, _ = index.knn_query(query_emb, k=min(search_k, index.get_current_count()))
-            retrieved_ids = [metadata.iloc[int(l)]["item_id"] for l in labels[0]][: max(k_values)]
+            retrieved_ids = [metadata.iloc[int(lbl)]["item_id"] for lbl in labels[0]][: max(k_values)]
 
             m = compute_metrics(retrieved_ids, gt_id, gallery_id_counts.get(gt_id, 1), k_values)
             for k in k_values:
