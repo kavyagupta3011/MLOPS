@@ -1,0 +1,79 @@
+# ============================================================
+# params.yaml — single source of truth for the small-scale rebuild
+# Read by every script in src/. Change values here, not in code.
+# This file is what DVC watches to know when a stage must re-run,
+# and it doubles as the "AutoML search space" seed for src/automl/.
+# ============================================================
+
+# ---- Paths -------------------------------------------------
+# BASE_DATA_DIR must contain the raw DeepFashion In-Shop files:
+#   list_eval_partition.txt, list_bbox_inshop.txt, img/img/...
+# It is NOT included in this repo (see README "Getting the dataset").
+paths:
+  base_data_dir: "data/raw/DeepFashionRetrieval"     # raw dataset root
+  bbox_file: "data/raw/DeepFashionRetrieval/list_bbox_inshop.txt"
+  partition_file: "data/raw/DeepFashionRetrieval/list_eval_partition.txt"
+  description_file: "data/raw/DeepFashionRetrieval/list_description_inshop.json"
+  small_split_dir: "data/processed/small_split"      # output of make_small_dataset.py
+  yolo_dataset_dir: "data/processed/yolo_dataset"
+  artifacts_dir: "artifacts"                         # models, indices, metadata land here
+
+# ---- Small-dataset sampling ---------------------------------
+# This is the "no need for huge training" knob. Bump n_items up
+# once the pipeline runs clean end to end.
+sampling:
+  n_items: 60          # distinct item_ids to keep (was 25,882 train identities)
+  min_images_per_item: 2
+  clothes_type_filter: null   # null=all, 1=upper-body, 2=lower-body, 3=full-body
+  split_seed: 42
+
+# ---- YOLO fine-tuning -----------------------------------------
+yolo:
+  base_weights: "yolov8n.pt"
+  epochs: 8
+  imgsz: 320
+  batch: 16
+
+# ---- CLIP fine-tuning (Configuration C) ------------------------
+clip:
+  arch: "ViT-B-32"
+  pretrained: "openai"
+  trainable_blocks: 4
+  epochs: 4
+  batch_size: 16
+  lr: 1.0e-5
+  weight_decay: 1.0e-4
+  temperature: 0.07
+  warmup_epochs: 1
+  grad_clip_norm: 1.0
+  seeds: [16, 34]        # trimmed from [16, 34, 59]; add 59 back once this runs clean
+
+# ---- Fusion (Configuration B / C) -------------------------------
+fusion:
+  alphas: [0.5, 0.7]
+
+# ---- Evaluation ---------------------------------------------------
+eval:
+  k_values: [5, 10, 15]
+  max_queries: 300
+
+# ---- MLflow --------------------------------------------------------
+# sqlite (not plain file:) because the Model Registry API — used by
+# src/ci/promote_to_registry.py and by serving/search_core.py to resolve
+# the champion — requires a database-backed tracking store. This file
+# lives locally (mlflow.db, gitignored); it is NOT shared with Kaggle,
+# which logs to its own file-store mlruns/ during training (see
+# kaggle/README.md) — registry promotion happens here, after you bring
+# a winning checkpoint back, not on Kaggle itself.
+mlflow:
+  tracking_uri: "sqlite:///mlflow.db"
+  experiment_name: "visual-search-mlops"
+  registry_model_name: "visual-search-clip"
+
+# ---- CI regression gate --------------------------------------------
+regression_gate:
+  metric: "recall@5"
+  # Must match a key evaluate.py actually writes to metrics.json — for
+  # Config C that's "C_alpha{alpha}_seed{seed}", not just "C_alpha0.7".
+  baseline_config: "C_alpha0.7_seed16"
+  max_allowed_drop: 0.03    # fail CI if new Recall@5 is more than 3pp below baseline

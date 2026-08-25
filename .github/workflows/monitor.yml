@@ -1,0 +1,52 @@
+# .github/workflows/monitor.yml — component C9 (continuous monitoring).
+#
+# Runs the canary check on a schedule against a deployed environment,
+# instead of only ever checking "did the pipeline finish." This is the
+# scheduled-workflow version of src/monitoring/canary_check.py; swap the
+# cron for whatever cadence makes sense once something is actually
+# deployed (see serving/Dockerfile).
+#
+# NOTE: this workflow expects artifacts/ (models + indices) to already
+# exist wherever it runs — either restore them from wherever your CI job
+# uploads them, or point this at a deployed instance and adapt
+# canary_check.py to hit its HTTP endpoint instead of loading local files.
+
+name: Monitor (canary check)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours
+  workflow_dispatch: {}      # allow manual "run now" from the Actions tab
+
+defaults:
+  run:
+    working-directory: MLOPS
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run canary check
+        run: python -m src.monitoring.canary_check
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Canary check failed — the deployed system returned empty or nonsensical results."
+          echo "This is the exact failure mode the Uber-story anecdote is about: no exception was thrown, but the feature is broken for users."
+      - name: Upload retrain signal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-signal
+          # canary_check.py writes this on failure (see src/monitoring/canary_check.py) —
+          # the same file orchestration/airflow's check_retrain_signal task reads on its
+          # next run. Uploading it here just makes the "why did this fail" reason visible
+          # from the Actions tab too, without needing to open the Airflow UI.
+          path: MLOPS/artifacts/retrain_signal.json
+          if-no-files-found: ignore

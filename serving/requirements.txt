@@ -1,0 +1,15 @@
+streamlit
+fastapi
+uvicorn[standard]
+python-multipart
+torch
+torchvision
+open-clip-torch
+ultralytics
+transformers
+hnswlib
+pandas
+numpy
+pillow
+pyyaml
+mlflow

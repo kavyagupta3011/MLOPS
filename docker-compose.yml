@@ -1,0 +1,74 @@
+# docker-compose.yml — the pragmatic, laptop-demoable stand-in for the
+# diagram's "Docker Image -> Kubernetes" step (component C8 model serving,
+# plus a visible face for the C7 ML metadata / registry store).
+#
+# A real Kubernetes Deployment would run N replicas of the same image
+# behind a Service/Ingress, with a separately-hosted MLflow tracking
+# server backed by a managed database. That's real infrastructure a
+# class project doesn't need — this file gives you the same three
+# logical pieces (UI, API, registry) running together with one command,
+# which is enough to demo "the served model is the one MLflow promoted."
+#
+# Usage (from this MLOPS/ root, after `dvc repro` has produced artifacts/
+# and mlflow.db locally):
+#   docker compose up --build
+#   Streamlit UI:  http://localhost:8501
+#   FastAPI:       http://localhost:8000/docs
+#   MLflow UI:     http://localhost:5000
+#
+# All three share the same host-mounted artifacts/, data/processed/, and
+# mlflow.db — so a version promoted via `python -m src.ci.promote_to_registry`
+# (or auto_promote_best.py) on the host is immediately what app/api serve
+# on their next restart (SearchEngine resolves the champion at startup;
+# `docker compose restart app api` to pick up a newly promoted version
+# without rebuilding).
+
+services:
+  mlflow:
+    image: python:3.11-slim
+    container_name: visual_search_mlflow
+    working_dir: /app
+    volumes:
+      - ./mlflow.db:/app/mlflow.db
+      - ./mlruns_artifacts:/app/mlruns_artifacts
+    ports:
+      - "5000:5000"
+    command: >
+      bash -c "
+      pip install --no-cache-dir mlflow &&
+      mlflow server
+        --backend-store-uri sqlite:///mlflow.db
+        --default-artifact-root /app/mlruns_artifacts
+        --host 0.0.0.0
+        --port 5000
+      "
+
+  app:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    container_name: visual_search_app
+    command: ["app"]
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./data/processed:/app/data/processed
+      - ./mlflow.db:/app/mlflow.db
+    depends_on:
+      - mlflow
+
+  api:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    container_name: visual_search_api
+    command: ["api"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./data/processed:/app/data/processed
+      - ./mlflow.db:/app/mlflow.db
+    depends_on:
+      - mlflow

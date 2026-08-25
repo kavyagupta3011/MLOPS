@@ -1,0 +1,121 @@
+# dvc.yaml — the pipeline's dependency graph (principle P2, component C3).
+#
+# This is the primary, always-works way to run the whole pipeline
+# end to end on a laptop: `dvc repro` walks these stages in order,
+# skips any stage whose inputs haven't changed since last run, and
+# is what the CI workflow (.github/workflows/ci.yml) calls too.
+#
+# orchestration/airflow/ provides the same steps as an Airflow DAG,
+# for anyone who wants the scheduler-based version the paper names
+# explicitly — see orchestration/airflow/README.md for why DVC is
+# the default here and Airflow is the optional/heavier path.
+
+stages:
+  validate_dataset:
+    cmd: python -m src.pipeline.00_validate_dataset
+    deps:
+      - src/pipeline/00_validate_dataset.py
+      - src/common.py
+      - ${paths.partition_file}
+      - ${paths.bbox_file}
+    params:
+      - sampling
+      - paths.partition_file
+      - paths.bbox_file
+    outs:
+      - artifacts/dataset_validation_report.json:
+          cache: false
+
+  make_small_dataset:
+    cmd: python -m src.data.make_small_dataset
+    deps:
+      - src/data/make_small_dataset.py
+      - src/common.py
+      - artifacts/dataset_validation_report.json
+    params:
+      - sampling
+      - paths.partition_file
+      - paths.base_data_dir
+    outs:
+      - data/processed/small_split
+
+  prepare_yolo_labels:
+    cmd: python -m src.pipeline.01_prepare_yolo_labels
+    deps:
+      - src/pipeline/01_prepare_yolo_labels.py
+      - src/common.py
+      - data/processed/small_split
+      - params.yaml
+    params:
+      - paths.bbox_file
+    outs:
+      - data/processed/yolo_dataset
+
+  train_yolo:
+    cmd: python -m src.pipeline.02_train_yolo
+    deps:
+      - src/pipeline/02_train_yolo.py
+      - data/processed/yolo_dataset
+    params:
+      - yolo
+    outs:
+      - artifacts/yolo/best.pt
+
+  embed_config_a:
+    cmd: python -m src.pipeline.03_embed_config_a
+    deps:
+      - src/pipeline/03_embed_config_a.py
+      - src/common.py
+      - artifacts/yolo/best.pt
+      - data/processed/small_split
+    outs:
+      - artifacts/index_A.bin
+      - artifacts/gallery_embeddings_A.npy
+      - artifacts/gallery_manifest.csv
+
+  caption_and_fuse_b:
+    cmd: python -m src.pipeline.04_caption_and_fuse_b
+    deps:
+      - src/pipeline/04_caption_and_fuse_b.py
+      - artifacts/gallery_embeddings_A.npy
+      - artifacts/gallery_manifest.csv
+    params:
+      - fusion.alphas
+    outs:
+      - artifacts/gallery_captions.csv
+      - artifacts/index_B_5.bin
+      - artifacts/index_B_7.bin
+
+  finetune_clip:
+    cmd: python -m src.pipeline.05_finetune_clip --all-seeds
+    deps:
+      - src/pipeline/05_finetune_clip.py
+      - artifacts/yolo/best.pt
+      - data/processed/small_split
+    params:
+      - clip
+    outs:
+      - artifacts/clip_checkpoints
+
+  embed_config_c:
+    cmd: python -m src.pipeline.06_embed_config_c
+    deps:
+      - src/pipeline/06_embed_config_c.py
+      - artifacts/clip_checkpoints
+      - artifacts/gallery_captions.csv
+    params:
+      - fusion.alphas
+      - clip.seeds
+    outs:
+      - artifacts/gallery_metadata.csv
+
+  evaluate:
+    cmd: python -m src.pipeline.07_evaluate
+    deps:
+      - src/pipeline/07_evaluate.py
+      - artifacts/gallery_metadata.csv
+    params:
+      - eval
+    metrics:
+      - artifacts/metrics.json:
+          cache: false

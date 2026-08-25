@@ -1,0 +1,60 @@
+# .github/workflows/ci.yml — component C1 (CI/CD automation, principle P1).
+#
+# Runs on every push/PR touching MLOPS/. Two jobs:
+#   1. lint     — fast, always runs, catches obvious breakage
+#   2. pipeline — runs the small-scale pipeline end to end via `dvc repro`
+#                 and fails the build if regression_gate.py detects a drop
+#                 in Recall@5 vs. the committed baseline.
+#
+# The pipeline job needs the raw DeepFashion files, which are NOT in this
+# repo (too large — see README "Getting the dataset"). Two realistic setups:
+#   (a) commit a tiny fixture dataset (a handful of item_ids) under
+#       data/raw/ for CI to run against, or
+#   (b) point DATASET_URL at wherever your team stores the small dataset
+#       and have this workflow download it before `dvc repro`.
+# This file ships with (a) assumed — adjust the "Get dataset" step for
+# your actual setup.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lint tools
+        run: pip install ruff
+      - name: Lint
+        run: ruff check src/ --line-length 110
+
+  pipeline:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Get dataset
+        run: |
+          echo "Fill this in: fetch/unpack the small fixture DeepFashion files"
+          echo "into data/raw/DeepFashionRetrieval/ so dvc repro has something to run on."
+      - name: Run pipeline (dvc repro)
+        run: dvc repro
+      - name: Regression gate
+        run: python -m src.ci.regression_gate
+      - name: Upload metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: artifacts/metrics.json

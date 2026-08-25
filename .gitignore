@@ -1,0 +1,14 @@
+# raw/processed data and generated artifacts are versioned by DVC, not git
+data/raw/
+data/processed/
+artifacts/*
+!artifacts/.gitkeep
+mlruns/
+mlruns_artifacts/
+mlflow.db
+*.pt
+*.bin
+__pycache__/
+*.pyc
+.env
+.DS_Store

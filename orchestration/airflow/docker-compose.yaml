@@ -1,0 +1,44 @@
+# orchestration/airflow/docker-compose.yaml
+#
+# Minimal single-container Airflow (SequentialExecutor + SQLite) — enough
+# to demonstrate DAG-based orchestration for this project without standing
+# up Postgres/Redis/multiple workers. Fine for a class project; not how
+# you'd run Airflow in production (the paper's own examples — Databricks
+# Workflows, managed Airflow — are the production-scale version of this).
+#
+# Usage (from this orchestration/airflow/ directory):
+#   docker compose up
+#   open http://localhost:8080  (user: admin / password: admin, set on first boot)
+#
+# The whole MLOPS/ project is mounted read-write into the container so the
+# DAG's `dvc repro -s <stage>` calls can see and modify project files.
+
+services:
+  airflow:
+    image: apache/airflow:2.9.3-python3.11
+    container_name: fashion_retrieval_airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      # Informational only — every script sets its own MLflow tracking URI
+      # from params.yaml (mlflow.tracking_uri: sqlite:///mlflow.db) rather
+      # than reading this env var, so tasks here and `dvc repro` run outside
+      # this container land in the same mlflow.db (mounted in via the
+      # PROJECT_DIR volume below), and promote_to_registry/auto_promote_best
+      # can see runs logged either way.
+      MLFLOW_TRACKING_URI: sqlite:////opt/airflow/project/mlflow.db
+    volumes:
+      - ../../:/opt/airflow/project           # the whole MLOPS/ tree
+      - ./dags:/opt/airflow/dags
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+      pip install -r /opt/airflow/project/requirements.txt &&
+      airflow db init &&
+      airflow users create --username admin --password admin --firstname a --lastname b --role Admin --email admin@example.com || true &&
+      airflow webserver -D &&
+      airflow scheduler
+      "
