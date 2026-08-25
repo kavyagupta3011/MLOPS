@@ -48,13 +48,21 @@ def main():
             "n_train_images": n_train_images,
         })
 
+        # project must be an ABSOLUTE path: some Ultralytics versions resolve a
+        # relative `project` against their own configured settings["runs_dir"]
+        # (e.g. a path inside site-packages on a fresh CI runner) instead of
+        # the current working directory — which silently writes best.pt
+        # somewhere other than where this script looks for it afterward.
+        # Passing an absolute path sidesteps that resolution entirely.
+        project_dir = os.path.abspath(os.path.join(p["artifacts_dir"], "yolo_runs"))
+
         model = YOLO(y["base_weights"])
         results = model.train(
             data=yaml_path,
             epochs=y["epochs"],
             imgsz=y["imgsz"],
             batch=y["batch"],
-            project="artifacts/yolo_runs",
+            project=project_dir,
             name="yolo_clothing",
             exist_ok=True,
             verbose=False,
@@ -70,7 +78,11 @@ def main():
         except Exception as e:
             print(f"[train_yolo] Could not log Ultralytics metrics: {e}")
 
-        best_src = os.path.join("artifacts/yolo_runs", "yolo_clothing", "weights", "best.pt")
+        # Prefer the actual save_dir Ultralytics used (belt-and-suspenders
+        # against any further path-resolution surprises across versions),
+        # falling back to the path we asked for if that attribute is absent.
+        save_dir = getattr(results, "save_dir", None) or os.path.join(project_dir, "yolo_clothing")
+        best_src = os.path.join(str(save_dir), "weights", "best.pt")
         os.makedirs(os.path.join(p["artifacts_dir"], "yolo"), exist_ok=True)
         best_dst = os.path.join(p["artifacts_dir"], "yolo", "best.pt")
         shutil.copy2(best_src, best_dst)
