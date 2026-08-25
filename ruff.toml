@@ -1,0 +1,27 @@
+# ruff.toml — pins the lint ruleset explicitly.
+#
+# Without this file, `ruff check` uses whatever ruff's CURRENT DEFAULT
+# ruleset happens to be — and that default has grown over ruff's release
+# history (0.15.x selected only E4/E7/E9/F — real errors and pyflakes
+# issues; 0.16.x's default additionally pulls in import-sorting, naming
+# conventions, blind-except warnings, missing-shebang checks, and more).
+# `.github/workflows/ci.yml` runs `pip install ruff` fresh on every CI
+# run, so it always gets the latest release — meaning the lint gate's
+# strictness would silently change out from under this project every
+# time ruff cuts a new version, with no code change on our end. That's
+# what caused CI run #2 to fail on ~40 pre-existing style opinions
+# (unsorted imports, `except Exception`, numeric-prefixed filenames used
+# deliberately so `python -m src.pipeline.00_validate_dataset` works)
+# that were never the point of this lint gate.
+#
+# select here matches ruff's own long-standing default (pre-0.16):
+# E4/E7/E9 (a slice of pycodestyle — real syntax/logic issues) + F
+# (pyflakes — undefined names, unused imports, etc.). That's what
+# "catches obvious breakage" (see ci.yml's own comment) actually means
+# for this project — not a full style-opinion enforcement pass.
+
+line-length = 110
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
