@@ -201,9 +201,11 @@ def main():
         with mlflow.start_run(run_name=f"eval_{config_name}"):
             mlflow.log_param("config", config_name)
             for k, vals in per_k.items():
-                mlflow.log_metric(f"recall@{k}", vals["recall"])
-                mlflow.log_metric(f"ndcg@{k}", vals["ndcg"])
-                mlflow.log_metric(f"map@{k}", vals["map"])
+                # MLflow metric names may only contain alphanumerics, "_", "-",
+                # ".", " ", ":", "/" — "@" (as in "recall@5") is rejected outright.
+                mlflow.log_metric(f"recall_at_{k}", vals["recall"])
+                mlflow.log_metric(f"ndcg_at_{k}", vals["ndcg"])
+                mlflow.log_metric(f"map_at_{k}", vals["map"])
 
     print("\n" + "=" * 70)
     print(f"{'Config':<22} | {'K':<4} | {'Recall':<8} | {'NDCG':<8} | {'mAP':<8}")
