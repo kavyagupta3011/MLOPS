@@ -1,19 +1,29 @@
 # .github/workflows/ci.yml — component C1 (CI/CD automation, principle P1).
 #
-# Runs on every push/PR touching MLOPS/. Two jobs:
+# Runs on every push/PR. Two jobs:
 #   1. lint     — fast, always runs, catches obvious breakage
 #   2. pipeline — runs the small-scale pipeline end to end via `dvc repro`
 #                 and fails the build if regression_gate.py detects a drop
 #                 in Recall@5 vs. the committed baseline.
 #
-# The pipeline job needs the raw DeepFashion files, which are NOT in this
-# repo (too large — see README "Getting the dataset"). Two realistic setups:
-#   (a) commit a tiny fixture dataset (a handful of item_ids) under
-#       data/raw/ for CI to run against, or
-#   (b) point DATASET_URL at wherever your team stores the small dataset
-#       and have this workflow download it before `dvc repro`.
-# This file ships with (a) assumed — adjust the "Get dataset" step for
-# your actual setup.
+# The pipeline job needs *some* dataset to run against, and the real
+# DeepFashion files are gigabytes — deliberately gitignored, can never
+# live in this repo (see README "Getting the dataset"). Real training
+# happens on Kaggle, against the real dataset (see kaggle/README.md).
+#
+# For CI specifically, this uses a tiny, synthetic fixture committed
+# under ci_fixture/ (see scripts/generate_ci_fixture.py — ~200KB, 12 fake
+# item_ids, correctly-formatted but placeholder images). It proves every
+# pipeline stage's *code path* runs correctly end to end on a real push —
+# it says nothing about model quality, since the images are solid-color
+# placeholders, not real clothing photos. The "Shrink params for CI" step
+# below also drops epochs/seeds to the minimum so this stays fast;
+# local/Kaggle runs use the real params.yaml unmodified (this only ever
+# edits the CI runner's throwaway checkout, never commits back).
+#
+# Expect this job to take several minutes on a fresh run — it's not
+# stuck, it's downloading the pretrained CLIP/BLIP/YOLO weights (~1.5GB
+# combined) that every run (fixture or real) needs regardless of dataset size.
 
 name: CI
 
@@ -46,8 +56,29 @@ jobs:
         run: pip install -r requirements.txt
       - name: Get dataset
         run: |
-          echo "Fill this in: fetch/unpack the small fixture DeepFashion files"
-          echo "into data/raw/DeepFashionRetrieval/ so dvc repro has something to run on."
+          mkdir -p data/raw
+          cp -r ci_fixture/DeepFashionRetrieval data/raw/DeepFashionRetrieval
+          echo "Copied the synthetic CI fixture (scripts/generate_ci_fixture.py) into data/raw/."
+          echo "This is NOT the real dataset — see the comment at the top of this file."
+      - name: Shrink params for CI
+        run: |
+          python -c "
+          import yaml
+          with open('params.yaml') as f:
+              p = yaml.safe_load(f)
+          # ci_fixture/ has 12 eligible item_ids — sample all of them, and
+          # train for 1 epoch each so this job stays fast. Everything else
+          # (arch, thresholds, fusion alphas) is left exactly as-is, so this
+          # still exercises the real code paths, not a special CI mode.
+          p['sampling']['n_items'] = 10
+          p['sampling']['min_images_per_item'] = 2
+          p['yolo']['epochs'] = 1
+          p['clip']['epochs'] = 1
+          p['clip']['seeds'] = [16]
+          with open('params.yaml', 'w') as f:
+              yaml.dump(p, f)
+          print('[ci] params.yaml shrunk for the CI fixture run (not committed back).')
+          "
       - name: Run pipeline (dvc repro)
         run: dvc repro
       - name: Regression gate

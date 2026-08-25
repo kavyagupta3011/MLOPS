@@ -3,6 +3,12 @@ data/raw/
 data/processed/
 artifacts/*
 !artifacts/.gitkeep
+# baseline_metrics.json is the one exception: regression_gate.py explicitly
+# tells you to commit it ("adopting this run as baseline... commit it to
+# lock it in") to make the CI regression gate mean something across runs —
+# excluding it under artifacts/* would silently make that instruction a
+# no-op, since nothing else here persists it between CI runs.
+!artifacts/baseline_metrics.json
 mlruns/
 mlruns_artifacts/
 mlflow.db
