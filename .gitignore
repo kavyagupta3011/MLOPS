@@ -18,3 +18,5 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+.venv/
+mlops_kaggle_output.zip

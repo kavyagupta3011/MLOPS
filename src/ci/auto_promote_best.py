@@ -81,7 +81,7 @@ def main():
         result = mlflow.register_model(model_uri=model_uri, name=model_name)
         client.set_model_version_tag(model_name, result.version, "config_name", best_config)
         client.set_model_version_tag(model_name, result.version, "promoted_by", "auto_promote_best")
-        client.set_model_version_tag(model_name, result.version, f"metric_{rg['metric']}", f"{best_score:.4f}")
+        client.set_model_version_tag(model_name, result.version, f"metric_{rg['metric'].replace('@', '_at_')}", f"{best_score:.4f}")  # mlflow tag/param keys can't contain '@' 
 
         client.transition_model_version_stage(
             name=model_name, version=result.version,

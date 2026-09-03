@@ -56,6 +56,7 @@ print(f"[STATUS] ---> Device: {device}")
 OUTPUT = "/kaggle/working"
 os.makedirs(f"{OUTPUT}/artifacts", exist_ok=True)
 
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"  # newer mlflow blocks file-store tracking by default; this Kaggle script intentionally uses one
 mlflow.set_tracking_uri(f"file:{OUTPUT}/mlruns")
 mlflow.set_experiment("visual-search-mlops")
 

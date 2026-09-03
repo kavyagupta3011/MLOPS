@@ -1,15 +1,25 @@
 # .github/workflows/monitor.yml — component C9 (continuous monitoring).
 #
-# Runs the canary check on a schedule against a deployed environment,
-# instead of only ever checking "did the pipeline finish." This is the
-# scheduled-workflow version of src/monitoring/canary_check.py; swap the
-# cron for whatever cadence makes sense once something is actually
-# deployed (see serving/Dockerfile).
+# Runs the canary check on a schedule. The promoted model (YOLO weights,
+# the winning CLIP checkpoint, its HNSW index, and gallery metadata) is
+# published as GitHub Release assets rather than committed to git — the
+# CLIP checkpoint alone is 605MB, over git's 100MB hard limit and well
+# past what a free Git LFS quota can sustain across repeated scheduled
+# runs. This step downloads just those four files before the check runs,
+# landing them at the exact paths serving/search_core.py expects for the
+# config params.yaml's regression_gate.baseline_config names — the same
+# fallback path used when the MLflow registry (mlflow.db, not shipped to
+# CI) is unreachable, which is always true on a fresh checkout.
 #
-# NOTE: this workflow expects artifacts/ (models + indices) to already
-# exist wherever it runs — either restore them from wherever your CI job
-# uploads them, or point this at a deployed instance and adapt
-# canary_check.py to hit its HTTP endpoint instead of loading local files.
+# To publish a new promoted model after retraining:
+#   gh release create model-v1 \
+#     artifacts/yolo/best.pt \
+#     artifacts/clip_checkpoints/clip_finetuned_16.pt \
+#     artifacts/index_C_7_16.bin \
+#     artifacts/gallery_metadata.csv \
+#     --title "Promoted model v1" --notes "C_alpha0.7_seed16, Recall@5=0.9167"
+# (bump the tag, e.g. model-v2, and update MODEL_RELEASE_TAG below, if the
+# baseline_config or its checkpoint ever changes.)
 
 name: Monitor (canary check)
 
@@ -17,6 +27,9 @@ on:
   schedule:
     - cron: "0 */6 * * *"   # every 6 hours
   workflow_dispatch: {}      # allow manual "run now" from the Actions tab
+
+env:
+  MODEL_RELEASE_TAG: model-v1
 
 defaults:
   run:
@@ -27,6 +40,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Download promoted model artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts/yolo artifacts/clip_checkpoints /tmp/release_assets
+          gh release download "$MODEL_RELEASE_TAG" --repo kavyagupta3011/MLOPS \
+            --pattern "best.pt" --pattern "clip_finetuned_16.pt" \
+            --pattern "index_C_7_16.bin" --pattern "gallery_metadata.csv" \
+            --dir /tmp/release_assets --clobber
+          mv /tmp/release_assets/best.pt artifacts/yolo/best.pt
+          mv /tmp/release_assets/clip_finetuned_16.pt artifacts/clip_checkpoints/clip_finetuned_16.pt
+          mv /tmp/release_assets/index_C_7_16.bin artifacts/index_C_7_16.bin
+          mv /tmp/release_assets/gallery_metadata.csv artifacts/gallery_metadata.csv
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

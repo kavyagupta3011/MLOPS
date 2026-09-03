@@ -53,12 +53,12 @@ if uploaded_file:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.image(original_img, caption="Original Image", use_column_width=True)
+        st.image(original_img, caption="Original Image", use_container_width=True)
     with col2:
         if was_cropped:
-            st.image(cropped_img, caption="YOLO Cropped Region", use_column_width=True)
+            st.image(cropped_img, caption="YOLO Cropped Region", use_container_width=True)
         else:
-            st.image(original_img, caption="No confident crop found", use_column_width=True)
+            st.image(original_img, caption="No confident crop found", use_container_width=True)
             st.warning("YOLO didn't find a confident bounding box. Proceeding with the original image.")
 
     K = st.slider("Number of results to retrieve (K)", min_value=3, max_value=15, value=5)
@@ -83,7 +83,7 @@ if uploaded_file:
                 with cols[col_idx]:
                     st.markdown(f"**Rank #{row_idx + col_idx + 1}**")
                     if os.path.exists(r["image_path"]):
-                        st.image(Image.open(r["image_path"]), use_column_width=True)
+                        st.image(Image.open(r["image_path"]), use_container_width=True)
                     else:
                         st.error("Image missing locally")
                     st.markdown(f"**Similarity:** {r['similarity']:.4f}")

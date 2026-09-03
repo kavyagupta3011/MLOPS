@@ -10,7 +10,7 @@ numpy
 pillow
 tqdm
 pyyaml
-mlflow
+mlflow<3  # registry promotion (register_model on a plain log_artifact()) relies on mlflow 2.x semantics; mlflow 3.x requires the newer Logged Model API instead
 dvc
 optuna
 streamlit
