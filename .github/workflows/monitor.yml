@@ -18,10 +18,6 @@ on:
     - cron: "0 */6 * * *"   # every 6 hours
   workflow_dispatch: {}      # allow manual "run now" from the Actions tab
 
-defaults:
-  run:
-    working-directory: MLOPS
-
 jobs:
   canary:
     runs-on: ubuntu-latest
