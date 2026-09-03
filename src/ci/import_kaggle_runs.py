@@ -44,7 +44,6 @@ def main():
     # Write side: local database-backed store (params.yaml's mlflow.tracking_uri)
     mlflow.set_tracking_uri(mf["tracking_uri"])
     mlflow.set_experiment(mf["experiment_name"])
-    write_client = MlflowClient()
 
     for seed in seeds:
         run_name = f"clip_finetune_seed{seed}"
