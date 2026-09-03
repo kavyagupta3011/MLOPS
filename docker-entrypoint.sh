@@ -1,5 +1,5 @@
 #!/bin/sh
-# docker-entrypoint.sh — picks Streamlit UI vs FastAPI inside the same image
+# docker-entrypoint.sh â€” picks Streamlit UI vs FastAPI inside the same image
 # (see serving/Dockerfile). `docker run visual-search-app` (or CMD's
 # default "app") starts Streamlit; `docker run visual-search-app api`
 # starts FastAPI instead. docker-compose.yml uses both from one image.

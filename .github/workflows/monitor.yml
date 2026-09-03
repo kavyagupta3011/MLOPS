@@ -31,10 +31,6 @@ on:
 env:
   MODEL_RELEASE_TAG: model-v1
 
-defaults:
-  run:
-    working-directory: MLOPS
-
 jobs:
   canary:
     runs-on: ubuntu-latest
@@ -74,5 +70,5 @@ jobs:
           # the same file orchestration/airflow's check_retrain_signal task reads on its
           # next run. Uploading it here just makes the "why did this fail" reason visible
           # from the Actions tab too, without needing to open the Airflow UI.
-          path: MLOPS/artifacts/retrain_signal.json
+          path: artifacts/retrain_signal.json
           if-no-files-found: ignore
