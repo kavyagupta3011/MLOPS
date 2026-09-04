@@ -20,3 +20,4 @@ __pycache__/
 .DS_Store
 .venv/
 mlops_kaggle_output.zip
+demo_small_split.zip
