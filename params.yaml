@@ -69,6 +69,14 @@ mlflow:
   tracking_uri: "sqlite:///mlflow.db"
   experiment_name: "visual-search-mlops"
   registry_model_name: "visual-search-clip"
+  # Optional secondary tracking mirror: 07_evaluate.py also logs every
+  # config's results here IF DATABRICKS_HOST + DATABRICKS_TOKEN are set as
+  # environment variables when the pipeline runs -- otherwise this is
+  # silently skipped (e.g. on CI, or a machine without Databricks set up).
+  # The Model Registry / promotion / serving stack stays entirely on the
+  # local sqlite tracking_uri above, unaffected either way -- see
+  # docs/principles_mapping.md for why the registry itself wasn't moved.
+  databricks_experiment_path: "/Users/kavya.gupta@iiitb.ac.in/visual-search-mlops"
 
 # ---- CI regression gate --------------------------------------------
 regression_gate:
