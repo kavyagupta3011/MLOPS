@@ -42,7 +42,7 @@ restatement of the paper's abstract.
 | Regression testing | `src/ci/regression_gate.py`, gated in `ci.yml` |
 | A/B testing / Split testing | `src/ci/champion_challenger.py` |
 | Apache Airflow | `orchestration/airflow/` |
-| Databricks | discussed, not built (see root `README.md` "What we didn't build, on purpose") |
+| Databricks | used as a secondary MLflow tracking mirror — `src/pipeline/07_evaluate.py` logs every config's real results to a Databricks Free Edition workspace if `DATABRICKS_HOST`/`DATABRICKS_TOKEN` are set, alongside the local sqlite tracking store; the Model Registry itself stays local (see root `README.md` "What we didn't build, on purpose" for why) |
 | Swift (object storage) | discussed, not built — DVC + a remote is the zero-infra equivalent (see root README) |
 | "Uber button" story (silent failure) | `src/monitoring/canary_check.py` — checks the user-visible outcome, not just "did the pipeline exit 0" |
 

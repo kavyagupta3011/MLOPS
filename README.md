@@ -233,15 +233,33 @@ manual choice with a logged search.
 
 ## What we didn't build, on purpose
 
-**Databricks** and **OpenStack Swift / S3** are named in the paper (and
-your notes) as production-scale tools for orchestration+compute and
-artifact storage respectively. Standing either up for a class project
-would be infrastructure with no audience. Instead: DVC + any remote is
-the zero-infra version of an artifact store, and a laptop/Kaggle running
-`dvc repro` (or the optional Airflow container) is the zero-infra version
-of a managed workflow platform. Say this explicitly in the report —
-naming the production equivalent of what you actually built is more
-convincing than an unused trial account.
+**OpenStack Swift / S3** is named in the paper as a production-scale
+artifact storage system. Standing one up for a class project would be
+infrastructure with no audience — DVC + any remote is the zero-infra
+version of the same idea, and GitHub Releases fill the same role for the
+few files too large for git (see the CLIP checkpoint, published under the
+repo's Releases tab and pulled down by CI/monitoring at runtime).
+
+**Databricks** is named in the paper as a production platform bundling
+compute, orchestration, and a managed MLflow instance into one product.
+Rather than leave it purely theoretical, this project connects to it for
+real, at the one point that's genuinely useful without needing a full
+migration: `src/pipeline/07_evaluate.py` mirrors every config's real
+Recall/NDCG/mAP results to a free Databricks Free Edition workspace's
+MLflow tracking server (`mlflow.set_tracking_uri("databricks")`),
+automatically, every time you actually evaluate — controlled by whether
+`DATABRICKS_HOST`/`DATABRICKS_TOKEN` are set locally, so it's silently
+skipped on CI or any machine without it configured. What's deliberately
+*not* moved to Databricks is the Model Registry: `promote_to_registry.py`
+/ `auto_promote_best.py` rely on `mlflow<3` registry semantics
+(`register_model()` on a plain `log_artifact()`), while Databricks' own
+registry is Unity-Catalog-based on the newer `mlflow` 3.x model — a
+different API shape that would mean rewriting the already-working
+promotion/serving code for no functional gain at this project's scale.
+So: real compute and orchestration stay local/Kaggle + DVC + Airflow,
+real artifact storage for oversized files is GitHub Releases, and
+Databricks is a real, live, secondary experiment-tracking backend — not
+an unused trial account.
 
 ## Repository layout
 

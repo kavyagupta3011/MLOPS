@@ -207,6 +207,34 @@ def main():
                 mlflow.log_metric(f"ndcg_at_{k}", vals["ndcg"])
                 mlflow.log_metric(f"map_at_{k}", vals["map"])
 
+    # --- Optional secondary mirror to Databricks-hosted MLflow ---
+    # Only attempted if DATABRICKS_HOST + DATABRICKS_TOKEN are set as env
+    # vars (e.g. on your own laptop after `mlflow.login()` / a PAT) — on
+    # CI, or any machine without these set, this is silently skipped and
+    # never blocks or fails the real pipeline. This mirrors every config's
+    # real results (not just the champion) to Databricks every time you
+    # actually evaluate, so it's a live secondary tracking backend rather
+    # than a one-off manual export. The local sqlite tracking_uri above
+    # remains the only thing the Model Registry / promotion / serving
+    # stack ever reads from — see docs/principles_mapping.md.
+    databricks_experiment = mf.get("databricks_experiment_path")
+    if os.environ.get("DATABRICKS_HOST") and os.environ.get("DATABRICKS_TOKEN") and databricks_experiment:
+        try:
+            mlflow.set_tracking_uri("databricks")
+            mlflow.set_experiment(databricks_experiment)
+            for config_name, per_k in all_metrics.items():
+                with mlflow.start_run(run_name=f"eval_{config_name}"):
+                    mlflow.log_param("config", config_name)
+                    for k, vals in per_k.items():
+                        mlflow.log_metric(f"recall_at_{k}", vals["recall"])
+                        mlflow.log_metric(f"ndcg_at_{k}", vals["ndcg"])
+                        mlflow.log_metric(f"map_at_{k}", vals["map"])
+            print(f"[evaluate] Also mirrored {len(all_metrics)} configs to Databricks experiment '{databricks_experiment}'.")
+        except Exception as exc:
+            print(f"[evaluate] Databricks mirror failed ({exc}) — local results are unaffected.")
+    else:
+        print("[evaluate] DATABRICKS_HOST/DATABRICKS_TOKEN not set — skipping Databricks mirror (this is optional).")
+
     print("\n" + "=" * 70)
     print(f"{'Config':<22} | {'K':<4} | {'Recall':<8} | {'NDCG':<8} | {'mAP':<8}")
     print("=" * 70)
