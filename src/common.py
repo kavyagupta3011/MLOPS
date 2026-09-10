@@ -32,7 +32,42 @@ import yaml
 def load_params(params_path: str = "params.yaml") -> dict:
     """Load params.yaml. Every script takes this as its single config source."""
     with open(params_path, "r") as f:
-        return yaml.safe_load(f)
+        params = yaml.safe_load(f)
+    dataset = params.get("dataset", {})
+    root = os.environ.get("MLOPS_DATASET_ROOT", dataset.get("root"))
+    dataset["root"] = root
+    dataset["mode"] = os.environ.get("MLOPS_DATASET_MODE", dataset.get("mode", "small"))
+    params["yolo"]["base_weights"] = os.environ.get(
+        "MLOPS_YOLO_WEIGHTS", params["yolo"]["base_weights"]
+    )
+    params["clip"]["pretrained"] = os.environ.get(
+        "MLOPS_CLIP_PRETRAINED", params["clip"]["pretrained"]
+    )
+    params.setdefault("models", {})["blip_pretrained"] = os.environ.get(
+        "MLOPS_BLIP_PRETRAINED",
+        params.get("models", {}).get("blip_pretrained", "Salesforce/blip-image-captioning-base"),
+    )
+    if root:
+        paths = params["paths"]
+        paths["base_data_dir"] = root
+        paths["partition_file"] = os.path.join(root, "list_eval_partition.txt")
+        paths["bbox_file"] = os.path.join(root, "list_bbox_inshop.txt")
+        paths["description_file"] = os.path.join(root, "list_description_inshop.json")
+    return params
+
+
+def get_split_dir(params: dict) -> str:
+    return params["paths"]["small_split_dir"]
+
+
+def get_clip_pretrained(params: dict):
+    return params["clip"].get("pretrained")
+
+
+def get_blip_pretrained(params: dict):
+    return params.get("models", {}).get(
+        "blip_pretrained", "Salesforce/blip-image-captioning-base"
+    )
 
 
 def set_seed(seed: int) -> None:

@@ -8,7 +8,7 @@ that logs its output as a tracked artifact instead of a notebook cell.
 
 Reads:
   artifacts/yolo/best.pt
-  paths.small_split_dir/gallery/<item_id>/*.jpg
+    paths.full_data_dir/img/img/<category>/<item_id>/*.jpg (gallery rows only)
 Writes:
   artifacts/index_A.bin
   artifacts/gallery_embeddings_A.npy   (kept for stage 4 caption fusion + Config C base)
@@ -39,12 +39,19 @@ def main():
 
     bbox_map = parse_bbox_file(p["bbox_file"])
 
-    gallery_dir = os.path.join(p["small_split_dir"], "gallery")
+    full_image_root = Path(p["full_data_dir"]) / "img" / "img"
     gallery_data = []
-    for item_folder in sorted(Path(gallery_dir).iterdir()):
-        if item_folder.is_dir():
-            for img_file in sorted(item_folder.glob("*.jpg")):
-                gallery_data.append((str(img_file), item_folder.name))
+    with open(p["partition_file"], encoding="utf-8") as partition:
+        for line in partition.readlines()[2:]:
+            image_name, item_id, evaluation_status = line.strip().split()
+            if evaluation_status != "gallery":
+                continue
+            relative_path = Path(image_name).relative_to("img")
+            img_path = full_image_root / relative_path
+            if img_path.exists():
+                gallery_data.append((str(img_path), item_id, relative_path))
+
+    gallery_data.sort(key=lambda row: row[2])
     print(f"[embed_config_a] {len(gallery_data)} gallery images.")
 
     yolo_model = YOLO(os.path.join(p["artifacts_dir"], "yolo", "best.pt"))
@@ -54,16 +61,16 @@ def main():
     clip_model = clip_model.to(device).eval()
 
     embeddings, item_ids, rel_paths, clothes_types = [], [], [], []
-    for img_path, item_id in tqdm(gallery_data, desc="Embedding gallery (Config A)"):
+    for img_path, item_id, relative_path in tqdm(gallery_data, desc="Embedding gallery (Config A)"):
         try:
-            filename = Path(img_path).name
+            filename = "_".join(relative_path.parts)
             cropped, _, _ = crop_with_yolo(
                 yolo_model, img_path, bbox_map=bbox_map, item_id=item_id, filename=filename
             )
             emb = get_image_embedding(clip_model, clip_preprocess, cropped, device).squeeze(0)
             embeddings.append(emb)
             item_ids.append(item_id)
-            rel_paths.append(f"{item_id}/{filename}")
+            rel_paths.append(relative_path.as_posix())
             clothes_types.append(bbox_map.get((item_id, filename), {}).get("clothes_type"))
         except Exception as e:
             print(f"  skipped {img_path}: {e}")

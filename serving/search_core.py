@@ -25,11 +25,10 @@ from PIL import Image
 from ultralytics import YOLO
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
-from src.common import load_params
+from src.common import (get_blip_pretrained, get_clip_pretrained,
+                        load_params)
 
 MLOPS_ROOT = os.path.join(os.path.dirname(__file__), "..")
-BLIP_CAPTION_ID = "Salesforce/blip-image-captioning-base"
-
 
 def resolve_champion(params: dict) -> str:
     """
@@ -85,7 +84,9 @@ class SearchEngine:
     def __init__(self, params: dict | None = None):
         self.params = params or load_params(os.path.join(MLOPS_ROOT, "params.yaml"))
         self.artifacts_dir = os.path.join(MLOPS_ROOT, self.params["paths"]["artifacts_dir"])
-        self.gallery_dir = os.path.join(MLOPS_ROOT, self.params["paths"]["small_split_dir"], "gallery")
+        self.gallery_dir = os.path.join(
+            MLOPS_ROOT, self.params["paths"]["full_data_dir"], "img", "img"
+        )
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.champion = resolve_champion(self.params)
@@ -97,7 +98,7 @@ class SearchEngine:
         self.yolo = YOLO(yolo_path)
 
         self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(
-            self.params["clip"]["arch"], pretrained=self.params["clip"]["pretrained"]
+            self.params["clip"]["arch"], pretrained=get_clip_pretrained(self.params)
         )
         self.clip_tokenizer = open_clip.get_tokenizer(self.params["clip"]["arch"])
         if ckpt_path:
@@ -113,8 +114,9 @@ class SearchEngine:
 
         self.metadata = pd.read_csv(os.path.join(self.artifacts_dir, "gallery_metadata.csv"))
 
-        self.blip_processor = BlipProcessor.from_pretrained(BLIP_CAPTION_ID)
-        self.blip_model = BlipForConditionalGeneration.from_pretrained(BLIP_CAPTION_ID).to(self.device).eval()
+        blip_source = get_blip_pretrained(self.params)
+        self.blip_processor = BlipProcessor.from_pretrained(blip_source)
+        self.blip_model = BlipForConditionalGeneration.from_pretrained(blip_source).to(self.device).eval()
 
     # -- crop / embed / fuse, ported unchanged from the original app.py --
 

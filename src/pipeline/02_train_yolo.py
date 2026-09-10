@@ -18,15 +18,19 @@ Run:
 """
 
 import os
-import shutil
-
-import mlflow
-from ultralytics import YOLO
-
-from src.common import load_params
-
+from pathlib import Path
 
 def main():
+    checkpoint_path = Path("artifacts/yolo/best.pt")
+    if checkpoint_path.exists():
+        print(f"[train_yolo] Existing weights found -> {checkpoint_path}")
+        return
+
+    import shutil
+    import mlflow
+    from ultralytics import YOLO
+    from src.common import load_params
+
     params = load_params()
     p, y, mf = params["paths"], params["yolo"], params["mlflow"]
 

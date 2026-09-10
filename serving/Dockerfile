@@ -29,6 +29,19 @@
 #     -v "$(pwd)/mlflow.db:/app/mlflow.db" \
 #     visual-search-app api
 #
+# Run the existing DVC pipeline from the image:
+#   docker run --rm \
+#     -v "$(pwd)/data/raw/DeepFashionRetrieval:/data/DeepFashionRetrieval:ro" \
+#     -v "$(pwd)/pretrained_models:/models:ro" \
+#     -v "$(pwd)/data/processed:/app/data/processed" \
+#     -v "$(pwd)/artifacts:/app/artifacts" \
+#     -e MLOPS_DATASET_ROOT=/data/DeepFashionRetrieval \
+#     -e MLOPS_DATASET_MODE=full \
+#     -e MLOPS_YOLO_WEIGHTS=/models/yolov8n.pt \
+#     -e MLOPS_CLIP_PRETRAINED=/models/clip-vit-b-32.pt \
+#     -e MLOPS_BLIP_PRETRAINED=/models/blip-image-captioning-base \
+#     visual-search-app dvc repro
+#
 # See docker-compose.yml at the repo root for both running together.
 #
 # NOTE: artifacts/ (models + indices, ~100s of MB), data/processed/

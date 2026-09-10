@@ -6,6 +6,10 @@
 set -e
 
 if [ "$1" = "api" ]; then
+    if [ "$1" = "dvc" ]; then
+        shift
+        exec dvc "$@"
+    elif [ "$1" = "api" ]; then
     echo "[docker-entrypoint] Starting FastAPI (serving/api.py) on :8000"
     exec uvicorn serving.api:app --host 0.0.0.0 --port 8000
 else
