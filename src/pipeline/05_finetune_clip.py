@@ -34,11 +34,12 @@ from ultralytics import YOLO
 class FashionDataset(Dataset):
     """Crops each training image with YOLO, returns (tensor, int_label)."""
 
-    def __init__(self, data, transform, yolo_model, bbox_map):
+    def __init__(self, data, transform, yolo_model, bbox_map, confidence_threshold):
         self.data = data
         self.transform = transform
         self.yolo_model = yolo_model
         self.bbox_map = bbox_map
+        self.confidence_threshold = confidence_threshold
         all_ids = sorted({iid for _, iid in data})
         self.id_to_int = {iid: i for i, iid in enumerate(all_ids)}
 
@@ -50,7 +51,8 @@ class FashionDataset(Dataset):
         try:
             filename = Path(path).name
             img, _, _ = crop_with_yolo(
-                self.yolo_model, path, bbox_map=self.bbox_map, item_id=item_id, filename=filename
+                self.yolo_model, path, bbox_map=self.bbox_map, item_id=item_id, filename=filename,
+                confidence_threshold=self.confidence_threshold,
             )
         except Exception:
             from PIL import Image
@@ -83,7 +85,8 @@ def run_one_seed(params, seed):
     device = get_device()
     set_seed(seed)
 
-    mlflow.set_tracking_uri(mf["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mf["experiment_name"])
 
     bbox_map = parse_bbox_file(p["bbox_file"])
@@ -120,7 +123,9 @@ def run_one_seed(params, seed):
             for param in block.parameters():
                 param.requires_grad = True
 
-        dataset = FashionDataset(train_data, clip_preprocess, yolo_model, bbox_map)
+        dataset = FashionDataset(
+            train_data, clip_preprocess, yolo_model, bbox_map, y["confidence_threshold"]
+        )
         loader = DataLoader(dataset, batch_size=c["batch_size"], shuffle=True,
                              num_workers=0, pin_memory=(device == "cuda"))
 

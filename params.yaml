@@ -15,6 +15,7 @@ paths:
   partition_file: "data/raw/DeepFashionRetrieval/list_eval_partition.txt"
   description_file: "data/raw/DeepFashionRetrieval/list_description_inshop.json"
   small_split_dir: "data/processed/small_split"      # output of make_small_dataset.py
+  full_gallery_dir: "data/processed/full_gallery"    # complete gallery for retrieval/serving
   yolo_dataset_dir: "data/processed/yolo_dataset"
   artifacts_dir: "artifacts"                         # models, indices, metadata land here
 
@@ -33,6 +34,7 @@ yolo:
   epochs: 8
   imgsz: 320
   batch: 16
+  confidence_threshold: 0.5
 
 # ---- CLIP fine-tuning (Configuration C) ------------------------
 clip:
@@ -58,24 +60,18 @@ eval:
   max_queries: 300
 
 # ---- MLflow --------------------------------------------------------
-# sqlite (not plain file:) because the Model Registry API — used by
-# src/ci/promote_to_registry.py and by serving/search_core.py to resolve
-# the champion — requires a database-backed tracking store. This file
-# lives locally (mlflow.db, gitignored); it is NOT shared with Kaggle,
-# which logs to its own file-store mlruns/ during training (see
-# kaggle/README.md) — registry promotion happens here, after you bring
-# a winning checkpoint back, not on Kaggle itself.
+# Use MLFLOW_TRACKING_URI to point all machines at the same externally
+# reachable MLflow server. The localhost default is for local/demo use.
 mlflow:
-  tracking_uri: "sqlite:///mlflow.db"
+  tracking_uri: "http://localhost:5000"
   experiment_name: "visual-search-mlops"
   registry_model_name: "visual-search-clip"
   # Optional secondary tracking mirror: 07_evaluate.py also logs every
   # config's results here IF DATABRICKS_HOST + DATABRICKS_TOKEN are set as
   # environment variables when the pipeline runs -- otherwise this is
   # silently skipped (e.g. on CI, or a machine without Databricks set up).
-  # The Model Registry / promotion / serving stack stays entirely on the
-  # local sqlite tracking_uri above, unaffected either way -- see
-  # docs/principles_mapping.md for why the registry itself wasn't moved.
+  # The Model Registry / promotion / serving stack uses the same configured
+  # tracking server; Databricks remains an optional secondary mirror.
   databricks_experiment_path: "/Users/kavya.gupta@iiitb.ac.in/visual-search-mlops"
 
 # ---- CI regression gate --------------------------------------------

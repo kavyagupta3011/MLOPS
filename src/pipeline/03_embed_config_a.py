@@ -8,7 +8,7 @@ that logs its output as a tracked artifact instead of a notebook cell.
 
 Reads:
   artifacts/yolo/best.pt
-  paths.small_split_dir/gallery/<item_id>/*.jpg
+  paths.full_gallery_dir/<item_id>/*.jpg
 Writes:
   artifacts/index_A.bin
   artifacts/gallery_embeddings_A.npy   (kept for stage 4 caption fusion + Config C base)
@@ -34,12 +34,13 @@ from src.common import (build_index, crop_with_yolo, get_device,
 def main():
     params = load_params()
     p = params["paths"]
+    y = params["yolo"]
     device = get_device()
     os.makedirs(p["artifacts_dir"], exist_ok=True)
 
     bbox_map = parse_bbox_file(p["bbox_file"])
 
-    gallery_dir = os.path.join(p["small_split_dir"], "gallery")
+    gallery_dir = p["full_gallery_dir"]
     gallery_data = []
     for item_folder in sorted(Path(gallery_dir).iterdir()):
         if item_folder.is_dir():
@@ -58,7 +59,8 @@ def main():
         try:
             filename = Path(img_path).name
             cropped, _, _ = crop_with_yolo(
-                yolo_model, img_path, bbox_map=bbox_map, item_id=item_id, filename=filename
+                yolo_model, img_path, bbox_map=bbox_map, item_id=item_id, filename=filename,
+                confidence_threshold=y["confidence_threshold"],
             )
             emb = get_image_embedding(clip_model, clip_preprocess, cropped, device).squeeze(0)
             embeddings.append(emb)

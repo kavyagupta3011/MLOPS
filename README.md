@@ -18,12 +18,27 @@ node to a file, and explains the two places this repo uses a pragmatic
 equivalent (Optuna instead of Kubeflow Katib, Docker Compose instead of
 Kubernetes) plus the one loop that's laptop-demoable rather than live.
 
-## What "smaller dataset" means here
+## Dataset layout: small training, full retrieval gallery
 
 Everything is driven by `params.yaml`. `sampling.n_items: 60` samples 60
 DeepFashion item identities (instead of the full ~26k training + ~12.6k
-gallery identities) and only copies their images. Bump it up once the
-pipeline runs clean end to end; the code doesn't change, only the number.
+gallery identities) for the `small_split` used by training and fast
+evaluation. The dataset preparation stage also copies **every** image whose
+partition is `gallery` into `data/processed/full_gallery`; this directory is
+never sampled. Config A/B/C indexes, captions, metadata, evaluation retrieval,
+and serving all use that full gallery, while CLIP training remains on
+`small_split/train` and queries remain in `small_split/query`.
+
+Generate both layouts with:
+
+```bash
+python -m src.pipeline.00_validate_dataset
+python -m src.data.make_small_dataset
+```
+
+The command is idempotent and prints the number of full-gallery images and
+items. Build full-gallery indexes with `dvc repro` or the individual index
+stages listed in `dvc.yaml`.
 
 ## Prerequisites
 
@@ -107,10 +122,20 @@ dvc repro -s train_yolo
 # ... etc, see dvc.yaml for the full stage list
 ```
 
-## 5. Look at what you tracked (principle P7) and the model registry (C6)
+## 5. MLflow tracking, sharing, and the model registry
+
+The code reads `MLFLOW_TRACKING_URI` first and falls back to
+`mlflow.tracking_uri` in `params.yaml`. For a local server:
 
 ```bash
-mlflow ui --backend-store-uri sqlite:///mlflow.db
+export MLFLOW_TRACKING_URI=http://localhost:5000
+# Windows PowerShell:
+$env:MLFLOW_TRACKING_URI="http://localhost:5000"
+```
+
+```bash
+mlflow server --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root ./mlruns_artifacts --host 0.0.0.0 --port 5000
 ```
 
 Open http://localhost:5000 — every YOLO training run, every CLIP
@@ -118,10 +143,19 @@ fine-tune (per seed), and every evaluated config is logged with its
 params and metrics. This is what replaces manually copying numbers into
 a report table.
 
-`mlflow.tracking_uri` in `params.yaml` is `sqlite:///mlflow.db` (a real
-database-backed store), not the default `file:./mlruns` — that's what
-makes the **Model Registry** tab in this same UI work. After a training
-run finishes, promote its checkpoint:
+For a shared server reachable by both laptops, set the same URI on both:
+
+```bash
+$env:MLFLOW_TRACKING_URI="http://<shared-server>:5000"
+```
+
+The server must use a shared, production-appropriate backend database and
+artifact store. Two separate local `sqlite:///mlflow.db` files are **not**
+shared. In the root Docker Compose stack, app and API default to
+`http://mlflow:5000` inside that Compose network; set `MLFLOW_TRACKING_URI`
+in `.env` to use an external shared server instead.
+
+After a training run finishes, promote its checkpoint:
 
 ```bash
 # promote whichever Config C variant currently scores best (automatic):
@@ -139,6 +173,13 @@ model and promotes it to the "Production" stage — `serving/search_core.py`
 reads that stage back at startup to decide which config to serve (falling
 back to `params.yaml`'s `regression_gate.baseline_config` if nothing's
 been promoted yet, e.g. right after a fresh clone).
+
+The configurable YOLO detection cutoff is
+`yolo.confidence_threshold` in `params.yaml` (default `0.5`). Trained YOLO
+weights are stored under `artifacts/yolo/`, fine-tuned CLIP checkpoints under
+`artifacts/clip_checkpoints/`, and generated full-gallery indexes/metadata
+under `artifacts/`. Generated data and model artifacts are managed by DVC,
+not committed directly to Git.
 
 ## 6. Evaluate, gate, and compare (principles P1, "regression testing", "A/B testing")
 

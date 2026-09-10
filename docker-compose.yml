@@ -10,14 +10,15 @@
 # which is enough to demo "the served model is the one MLflow promoted."
 #
 # Usage (from this MLOPS/ root, after `dvc repro` has produced artifacts/
-# and mlflow.db locally):
+# and the local MLflow service is ready):
 #   docker compose up --build
 #   Streamlit UI:  http://localhost:8501
 #   FastAPI:       http://localhost:8000/docs
 #   MLflow UI:     http://localhost:5000
 #
-# All three share the same host-mounted artifacts/, data/processed/, and
-# mlflow.db — so a version promoted via `python -m src.ci.promote_to_registry`
+# All three share the same host-mounted artifacts/ and data/processed/.
+# The app and API use the internal MLflow service by default; a version
+# promoted via `python -m src.ci.promote_to_registry`
 # (or auto_promote_best.py) on the host is immediately what app/api serve
 # on their next restart (SearchEngine resolves the champion at startup;
 # `docker compose restart app api` to pick up a newly promoted version
@@ -47,6 +48,8 @@ services:
       - ./artifacts:/app/artifacts
       - ./data/processed:/app/data/processed
       - ./mlflow.db:/app/mlflow.db
+    environment:
+      MLFLOW_TRACKING_URI: "${MLFLOW_TRACKING_URI:-http://mlflow:5000}"
     depends_on:
       - mlflow
 
@@ -62,5 +65,7 @@ services:
       - ./artifacts:/app/artifacts
       - ./data/processed:/app/data/processed
       - ./mlflow.db:/app/mlflow.db
+    environment:
+      MLFLOW_TRACKING_URI: "${MLFLOW_TRACKING_URI:-http://mlflow:5000}"
     depends_on:
       - mlflow

@@ -44,7 +44,8 @@ def resolve_champion(params: dict) -> str:
         import mlflow
         from mlflow.tracking import MlflowClient
 
-        mlflow.set_tracking_uri(mf["tracking_uri"])
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+        mlflow.set_tracking_uri(tracking_uri)
         client = MlflowClient()
         model_name = mf.get("registry_model_name", "visual-search-clip")
         versions = client.get_latest_versions(model_name, stages=["Production"])
@@ -85,7 +86,10 @@ class SearchEngine:
     def __init__(self, params: dict | None = None):
         self.params = params or load_params(os.path.join(MLOPS_ROOT, "params.yaml"))
         self.artifacts_dir = os.path.join(MLOPS_ROOT, self.params["paths"]["artifacts_dir"])
-        self.gallery_dir = os.path.join(MLOPS_ROOT, self.params["paths"]["small_split_dir"], "gallery")
+        self.gallery_dir = os.path.join(MLOPS_ROOT, self.params["paths"]["full_gallery_dir"])
+        self.yolo_confidence_threshold = float(
+            self.params["yolo"].get("confidence_threshold", 0.5)
+        )
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.champion = resolve_champion(self.params)
@@ -127,7 +131,9 @@ class SearchEngine:
             return pil_image, False, None
         matching = [
             b for b in boxes
-            if float(b.conf) > 0.5 and (requested_yolo_class is None or int(b.cls[0]) == requested_yolo_class)
+            if float(b.conf) > self.yolo_confidence_threshold and (
+                requested_yolo_class is None or int(b.cls[0]) == requested_yolo_class
+            )
         ]
         if not matching:
             return pil_image, False, None

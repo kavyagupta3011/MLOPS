@@ -70,7 +70,8 @@ def main():
     artifact = f"clip_finetuned_{seed}.pt"
 
     try:
-        mlflow.set_tracking_uri(mf["tracking_uri"])
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+        mlflow.set_tracking_uri(tracking_uri)
         client = MlflowClient()
 
         run_id = find_run_id_by_name(client, mf["experiment_name"], run_name)

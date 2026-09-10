@@ -22,13 +22,10 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
-      # Informational only — every script sets its own MLflow tracking URI
-      # from params.yaml (mlflow.tracking_uri: sqlite:///mlflow.db) rather
-      # than reading this env var, so tasks here and `dvc repro` run outside
-      # this container land in the same mlflow.db (mounted in via the
-      # PROJECT_DIR volume below), and promote_to_registry/auto_promote_best
-      # can see runs logged either way.
-      MLFLOW_TRACKING_URI: sqlite:////opt/airflow/project/mlflow.db
+      # Override this in .env when Airflow should use a shared MLflow server.
+      # This separate Compose project is not automatically on the root
+      # Compose network.
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
     volumes:
       - ../../:/opt/airflow/project           # the whole MLOPS/ tree
       - ./dags:/opt/airflow/dags

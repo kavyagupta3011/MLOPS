@@ -10,6 +10,7 @@ Reads:
   paths.partition_file   (list_eval_partition.txt: image_name item_id split)
 Writes:
   paths.small_split_dir/{train,query,gallery}/<item_id>/<flattened_name>.jpg
+  paths.full_gallery_dir/<item_id>/<flattened_name>.jpg
 
 Run:
   python -m src.data.make_small_dataset
@@ -43,6 +44,7 @@ def main():
     partition_file = p["partition_file"]
     base_img_dir = os.path.join(p["base_data_dir"], "img", "img")
     output_dir = p["small_split_dir"]
+    full_gallery_dir = p["full_gallery_dir"]
 
     if not os.path.exists(partition_file):
         raise FileNotFoundError(
@@ -71,28 +73,38 @@ def main():
 
     for split in ["train", "query", "gallery"]:
         os.makedirs(os.path.join(output_dir, split), exist_ok=True)
+    os.makedirs(full_gallery_dir, exist_ok=True)
 
-    copied, missing = 0, 0
+    copied, missing, full_gallery_images = 0, 0, 0
+    full_gallery_items = set()
     for img_path, item_id, split in entries:
-        if item_id not in chosen_items:
-            continue
-
         src = os.path.join(base_img_dir, img_path.replace("img/", "", 1))
         if not os.path.exists(src):
-            missing += 1
+            if item_id in chosen_items or split == "gallery":
+                missing += 1
             continue
 
-        dest_folder = os.path.join(output_dir, split, item_id)
-        os.makedirs(dest_folder, exist_ok=True)
         file_name = img_path.replace("img/", "", 1).replace("/", "_")
-        shutil.copy2(src, os.path.join(dest_folder, file_name))
-        copied += 1
+        if split == "gallery":
+            full_dest_folder = os.path.join(full_gallery_dir, item_id)
+            os.makedirs(full_dest_folder, exist_ok=True)
+            shutil.copy2(src, os.path.join(full_dest_folder, file_name))
+            full_gallery_images += 1
+            full_gallery_items.add(item_id)
+
+        if item_id in chosen_items:
+            dest_folder = os.path.join(output_dir, split, item_id)
+            os.makedirs(dest_folder, exist_ok=True)
+            shutil.copy2(src, os.path.join(dest_folder, file_name))
+            copied += 1
 
     print(f"[make_small_dataset] Copied {copied} images, {missing} missing on disk.")
     for split in ["train", "query", "gallery"]:
         split_path = os.path.join(output_dir, split)
         n = sum(len(files) for _, _, files in os.walk(split_path))
         print(f"  {split}: {n} images")
+    print(f"[make_small_dataset] Full gallery: {full_gallery_images} images "
+          f"across {len(full_gallery_items)} items -> {full_gallery_dir}")
 
 
 if __name__ == "__main__":

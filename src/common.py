@@ -99,10 +99,10 @@ CLOTHES_LABEL = {1: "Upper-body", 2: "Lower-body", 3: "Full-body", None: "All"}
 # ---------------------------------------------------------------------------
 
 def crop_with_yolo(yolo_model, img, requested_type=None, bbox_map=None, item_id=None,
-                    filename=None, use_gt_fallback=True):
+                    filename=None, use_gt_fallback=True, confidence_threshold=0.5):
     """
     Same three-tier crop logic as training.ipynb / app.py:
-      1. fine-tuned YOLO detection (confidence > 0.4, filtered by requested_type)
+      1. fine-tuned YOLO detection (filtered by confidence_threshold and requested_type)
       2. ground-truth DeepFashion bbox, if available
       3. full image
     `img` may be a path (str) or a PIL.Image.
@@ -127,7 +127,7 @@ def crop_with_yolo(yolo_model, img, requested_type=None, bbox_map=None, item_id=
 
     matching = [
         b for b in (boxes or [])
-        if float(b.conf) > 0.4
+        if float(b.conf) > confidence_threshold
         and (requested_yolo_class is None or int(b.cls[0]) == requested_yolo_class)
     ]
 

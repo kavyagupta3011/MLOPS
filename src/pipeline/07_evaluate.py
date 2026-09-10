@@ -2,8 +2,8 @@
 src/pipeline/07_evaluate.py — Stage 8: evaluation + regression baseline.
 
 Runs Recall@K / NDCG@K / mAP@K (same formulas as eval.py / the report's
-section 9) for every built index — Config A, both Config B alphas, and
-Config C for every (alpha, seed) pair — against the small query split.
+section 9) for every built full-gallery index — Config A, both Config B
+alphas, and Config C for every (alpha, seed) pair — against the small query split.
 
 To keep a small-dataset run fast, the query pipeline here fuses the query
 image embedding with its own BLIP caption (mirroring app.py's live query
@@ -76,7 +76,7 @@ def load_query_data(query_dir, metadata):
 
 def evaluate_index(config_name, index, query_data, metadata, clip_model, clip_preprocess,
                     clip_tokenizer, yolo_model, blip_processor, blip_model, bbox_map,
-                    device, k_values, alpha=None):
+                    device, k_values, yolo_confidence_threshold, alpha=None):
     gallery_id_counts = metadata["item_id"].value_counts().to_dict()
     results = {k: {"recall": [], "ndcg": [], "map": []} for k in k_values}
 
@@ -86,6 +86,7 @@ def evaluate_index(config_name, index, query_data, metadata, clip_model, clip_pr
             cropped, _, _ = crop_with_yolo(
                 yolo_model, img_path, requested_type=requested_type,
                 bbox_map=bbox_map, item_id=gt_id, filename=filename,
+                confidence_threshold=yolo_confidence_threshold,
             )
             img_emb = get_image_embedding(clip_model, clip_preprocess, cropped, device)
 
@@ -123,11 +124,12 @@ def evaluate_index(config_name, index, query_data, metadata, clip_model, clip_pr
 
 def main():
     params = load_params()
-    p, e, mf = params["paths"], params["eval"], params["mlflow"]
+    p, e, mf, y = params["paths"], params["eval"], params["mlflow"], params["yolo"]
     device = get_device()
     k_values = e["k_values"]
 
-    mlflow.set_tracking_uri(mf["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mf["experiment_name"])
 
     metadata = pd.read_csv(os.path.join(p["artifacts_dir"], "gallery_metadata.csv"))
@@ -153,7 +155,8 @@ def main():
     index_a = load_index(os.path.join(p["artifacts_dir"], "index_A.bin"))
     all_metrics["A"] = evaluate_index(
         "A (vision-only)", index_a, query_data, metadata, clip_base, clip_preprocess,
-        tokenizer, yolo_model, blip_processor, blip_model, bbox_map, device, k_values, alpha=None,
+        tokenizer, yolo_model, blip_processor, blip_model, bbox_map, device, k_values,
+        y["confidence_threshold"], alpha=None,
     )
 
     # --- Config B ---
@@ -165,7 +168,8 @@ def main():
         index_b = load_index(idx_path)
         all_metrics[f"B_alpha{alpha}"] = evaluate_index(
             f"B alpha={alpha}", index_b, query_data, metadata, clip_base, clip_preprocess,
-            tokenizer, yolo_model, blip_processor, blip_model, bbox_map, device, k_values, alpha=alpha,
+            tokenizer, yolo_model, blip_processor, blip_model, bbox_map, device, k_values,
+            y["confidence_threshold"], alpha=alpha,
         )
 
     # --- Config C ---
@@ -188,7 +192,7 @@ def main():
             all_metrics[f"C_alpha{alpha}_seed{seed}"] = evaluate_index(
                 f"C alpha={alpha} seed={seed}", index_c, query_data, metadata, clip_ft,
                 clip_preprocess, tokenizer, yolo_model, blip_processor, blip_model, bbox_map,
-                device, k_values, alpha=alpha,
+                device, k_values, y["confidence_threshold"], alpha=alpha,
             )
 
     os.makedirs(p["artifacts_dir"], exist_ok=True)
