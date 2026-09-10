@@ -54,6 +54,7 @@ warnings.filterwarnings("ignore")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"[STATUS] ---> Device: {device}")
 OUTPUT = "/kaggle/working"
+YOLO_CONFIDENCE_THRESHOLD = 0.5
 os.makedirs(f"{OUTPUT}/artifacts", exist_ok=True)
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"  # newer mlflow blocks file-store tracking by default; this Kaggle script intentionally uses one
@@ -86,7 +87,7 @@ if not (partition_file and bbox_file and base_img_dir):
 print(f" partition_file: {partition_file}\n bbox_file: {bbox_file}\n base_img_dir: {base_img_dir}")
 
 
-# ── Stage 1: sample N_ITEMS and copy into train/query/gallery ───────────
+# ── Stage 1: sample train/query and copy the complete gallery ───────────
 print(f"\n[STATUS] ---> Sampling {N_ITEMS} item_ids...")
 with open(partition_file, 'r') as f:
     lines = f.readlines()[2:]
@@ -108,21 +109,27 @@ chosen = set(eligible[:N_ITEMS])
 print(f" {len(chosen)} item_ids chosen (of {len(eligible)} eligible, {len(by_item)} total).")
 
 split_dir = f"{OUTPUT}/small_split"
+full_gallery_dir = f"{OUTPUT}/full_gallery"
 for split in ["train", "query", "gallery"]:
     os.makedirs(f"{split_dir}/{split}", exist_ok=True)
+os.makedirs(full_gallery_dir, exist_ok=True)
 
 copied = 0
 for img_path, item_id, split in tqdm(entries, desc="Copying"):
-    if item_id not in chosen:
+    if item_id not in chosen and split != "gallery":
         continue
     src = os.path.join(base_img_dir, img_path.replace("img/", "", 1))
     if not os.path.exists(src):
         continue
-    dest_folder = f"{split_dir}/{split}/{item_id}"
-    os.makedirs(dest_folder, exist_ok=True)
     file_name = img_path.replace("img/", "", 1).replace("/", "_")
-    shutil.copy2(src, f"{dest_folder}/{file_name}")
-    copied += 1
+    dest_roots = [full_gallery_dir] if split == "gallery" else [split_dir]
+    if split == "gallery" and item_id in chosen:
+        dest_roots.append(split_dir)
+    for dest_root in dest_roots:
+        dest_folder = f"{dest_root}/{item_id}"
+        os.makedirs(dest_folder, exist_ok=True)
+        shutil.copy2(src, f"{dest_folder}/{file_name}")
+        copied += 1
 print(f" Copied {copied} images.")
 
 
@@ -136,9 +143,9 @@ def load_split(split_dir_):
 
 
 train_data = load_split(f"{split_dir}/train")
-gallery_data = load_split(f"{split_dir}/gallery")
+gallery_data = load_split(full_gallery_dir)
 query_data = load_split(f"{split_dir}/query")
-print(f" train:{len(train_data)}  gallery:{len(gallery_data)}  query:{len(query_data)}")
+print(f" train:{len(train_data)}  full_gallery:{len(gallery_data)}  query:{len(query_data)}")
 
 
 # ── Parse GT bboxes (same logic as training.ipynb Cell 3b) ──────────────
@@ -219,7 +226,7 @@ def crop_with_yolo(img_path_or_pil, requested_type=None):
         img, gt_info = img_path_or_pil.convert("RGB"), None
     results = yolo_model(img, verbose=False)
     boxes = results[0].boxes
-    matching = [b for b in (boxes or []) if float(b.conf) > 0.4 and
+    matching = [b for b in (boxes or []) if float(b.conf) > YOLO_CONFIDENCE_THRESHOLD and
                 (requested_yolo_class is None or int(b.cls[0]) == requested_yolo_class)]
     if matching:
         best = max(matching, key=lambda b: float(b.conf))
@@ -411,7 +418,7 @@ print(f"\n[STATUS] ---> gallery_metadata.csv written ({len(metadata_df)} rows)."
 print("\n[STATUS] ---> Zipping artifacts + mlruns + gallery images for download...")
 shutil.make_archive(f"{OUTPUT}/mlops_kaggle_output", "zip", root_dir=OUTPUT,
                      base_dir="artifacts")
-get_ipython().system(f'cd {OUTPUT} && zip -rq mlops_kaggle_output.zip mlruns small_split')
+get_ipython().system(f'cd {OUTPUT} && zip -rq mlops_kaggle_output.zip mlruns small_split full_gallery')
 
 from IPython.display import FileLink, display
 print("\n ALL DONE. Download this and follow MLOPS/kaggle/README.md to unpack it locally:")

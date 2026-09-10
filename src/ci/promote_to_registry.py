@@ -14,9 +14,9 @@ checkpoint as a new version of the model named in
 params.yaml -> mlflow.registry_model_name, and promotes that version to
 the "Production" stage (archiving whatever was Production before).
 
-Requires a database-backed MLflow tracking URI (params.yaml's
-mlflow.tracking_uri is sqlite:///mlflow.db by default) — the Model
-Registry API isn't available against a plain file store.
+Requires an MLflow tracking server URI (params.yaml's
+mlflow.tracking_uri is the local server by default) — the Model Registry
+API requires a database-backed server.
 
 The registry entry stores more than the checkpoint: `--config-name` (e.g.
 "C_alpha0.7_seed16") is written as a tag on the registered version. That
@@ -36,6 +36,7 @@ Run, after a training run has finished (e.g. clip_finetune_seed16):
 """
 
 import argparse
+import os
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -69,7 +70,8 @@ def main():
     params = load_params()
     mf = params["mlflow"]
 
-    mlflow.set_tracking_uri(mf["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     client = MlflowClient()
 
     run_id = find_run_id_by_name(client, mf["experiment_name"], args.run_name)

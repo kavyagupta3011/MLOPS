@@ -14,7 +14,7 @@ restatement of the paper's abstract.
 | P2 | Workflow orchestration | `dvc.yaml` (primary) and `orchestration/airflow/` (optional, named explicitly in the paper) |
 | P3 | Reproducibility | `params.yaml` as the single config source + `dvc.yaml` dependency hashing — same params + same code = same outputs |
 | P4 | Versioning | DVC for data/model artifacts (see README "Set up DVC"), git for code; retires the old `previous_version_files/` folder |
-| P5 | Collaboration | Shared `params.yaml`, MLflow experiment shared across the team (point `mlflow.tracking_uri` at a shared server, not just `file:./mlruns`) |
+| P5 | Collaboration | Shared `params.yaml`, MLflow experiment shared across the team via `MLFLOW_TRACKING_URI` pointing at the same server |
 | P6 | Continuous ML training & evaluation | `orchestration/airflow/dags/fashion_retrieval_dag.py` can be scheduled (e.g. `@weekly`) instead of triggered manually |
 | P7 | ML metadata tracking/logging | MLflow calls in `src/pipeline/02_train_yolo.py`, `05_finetune_clip.py`, `07_evaluate.py` — replaces manually copying Table 4's losses into the report |
 | P8 | Continuous monitoring | `src/monitoring/canary_check.py` + `.github/workflows/monitor.yml` |
@@ -29,7 +29,7 @@ restatement of the paper's abstract.
 | C3 | Workflow orchestration | `dvc.yaml`, `orchestration/airflow/` |
 | C4 | Feature store | `artifacts/gallery_manifest.csv` / `gallery_metadata.csv` — a flat-file stand-in, honestly labeled as such (a real feature store buys you online/offline serving parity, which this project doesn't need) |
 | C5 | Model training infrastructure | whatever runs `dvc repro` — a laptop, Kaggle, or Colab; not distributed, and doesn't need to be at this scale |
-| C6 | Model registry | The real MLflow Model Registry now (`mlflow.tracking_uri: sqlite:///mlflow.db` in `params.yaml` — a DB-backed store, required for the Registry API) — `src/ci/promote_to_registry.py` and `src/ci/auto_promote_best.py` register + promote to "Production"; `serving/search_core.py resolve_champion()` reads it back, falling back to `params.yaml`'s `regression_gate.baseline_config` if the registry is unreachable |
+| C6 | Model registry | The real MLflow Model Registry, configured by `MLFLOW_TRACKING_URI` with the local server as fallback — `src/ci/promote_to_registry.py` and `src/ci/auto_promote_best.py` register + promote to "Production"; `serving/search_core.py resolve_champion()` reads it back, falling back to `params.yaml`'s `regression_gate.baseline_config` if the registry is unreachable |
 | C7 | ML metadata store | MLflow (`mlruns/` locally for tracking, or a shared tracking server; the registry itself lives in `mlflow.db`) |
 | C8 | Model serving | `serving/app.py` (Streamlit) + `serving/api.py` (FastAPI) + `serving/search_core.py` (shared logic) + `serving/Dockerfile` / root `docker-compose.yml` |
 | C9 | Monitoring | `src/monitoring/canary_check.py` |

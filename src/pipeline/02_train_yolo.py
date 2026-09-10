@@ -30,7 +30,8 @@ def main():
     params = load_params()
     p, y, mf = params["paths"], params["yolo"], params["mlflow"]
 
-    mlflow.set_tracking_uri(mf["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mf["experiment_name"])
 
     yaml_path = os.path.join(p["yolo_dataset_dir"], "clothing.yaml")

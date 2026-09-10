@@ -36,8 +36,10 @@ stages:
       - sampling
       - paths.partition_file
       - paths.base_data_dir
+      - paths.full_gallery_dir
     outs:
       - data/processed/small_split
+      - data/processed/full_gallery
 
   prepare_yolo_labels:
     cmd: python -m src.pipeline.01_prepare_yolo_labels
@@ -67,11 +69,13 @@ stages:
       - src/pipeline/03_embed_config_a.py
       - src/common.py
       - artifacts/yolo/best.pt
-      - data/processed/small_split
+      - data/processed/full_gallery
     outs:
       - artifacts/index_A.bin
       - artifacts/gallery_embeddings_A.npy
       - artifacts/gallery_manifest.csv
+    params:
+      - yolo.confidence_threshold
 
   caption_and_fuse_b:
     cmd: python -m src.pipeline.04_caption_and_fuse_b
@@ -79,6 +83,7 @@ stages:
       - src/pipeline/04_caption_and_fuse_b.py
       - artifacts/gallery_embeddings_A.npy
       - artifacts/gallery_manifest.csv
+      - data/processed/full_gallery
     params:
       - fusion.alphas
     outs:
@@ -103,9 +108,11 @@ stages:
       - src/pipeline/06_embed_config_c.py
       - artifacts/clip_checkpoints
       - artifacts/gallery_captions.csv
+      - data/processed/full_gallery
     params:
       - fusion.alphas
       - clip.seeds
+      - yolo.confidence_threshold
     outs:
       - artifacts/gallery_metadata.csv
 
@@ -116,6 +123,7 @@ stages:
       - artifacts/gallery_metadata.csv
     params:
       - eval
+      - yolo.confidence_threshold
     metrics:
       - artifacts/metrics.json:
           cache: false

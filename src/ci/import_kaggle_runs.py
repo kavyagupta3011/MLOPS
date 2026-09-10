@@ -1,14 +1,14 @@
 """
 src/ci/import_kaggle_runs.py — one-time bridge between Kaggle's file-store
-mlruns/ (where training actually logged to) and the local database-backed
-mlflow.db (where the Model Registry API — used by promote_to_registry.py /
-auto_promote_best.py — actually lives). See params.yaml's mlflow.tracking_uri
-comment: these are two separate MLflow backends by design.
+mlruns/ (where training actually logged to) and the configured MLflow server
+(where the Model Registry API — used by promote_to_registry.py /
+auto_promote_best.py — lives). The write side uses MLFLOW_TRACKING_URI or
+params.yaml's local-server fallback.
 
 For each seed in params.yaml's clip.seeds, finds the matching
 "clip_finetune_seed{N}" run in the Kaggle file-store, copies its real
-params/metrics, and re-logs it as a new run of the same name in the local
-sqlite backend with the actual checkpoint attached as an artifact — so
+params/metrics, and re-logs it as a new run of the same name with the actual
+checkpoint attached as an artifact — so
 find_run_id_by_name() in promote_to_registry.py can locate it.
 
 Run once, after bringing artifacts/ and mlruns/ back from Kaggle:
@@ -27,7 +27,7 @@ def main():
     mf = params["mlflow"]
     seeds = params["clip"]["seeds"]
 
-    # Read side: Kaggle's file-store
+    # Read side: Kaggle's file-store (intentionally local to that run).
     file_client = MlflowClient(tracking_uri="file:./mlruns")
     # Search across every experiment in the file store, not just mf["experiment_name"] —
     # Ultralytics' built-in MLflow auto-logging can silently redirect the active experiment
@@ -41,8 +41,9 @@ def main():
         return
     all_exp_ids = [e.experiment_id for e in all_experiments]
 
-    # Write side: local database-backed store (params.yaml's mlflow.tracking_uri)
-    mlflow.set_tracking_uri(mf["tracking_uri"])
+    # Write side: the shared tracking server, or params.yaml's local default.
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mf["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mf["experiment_name"])
 
     for seed in seeds:

@@ -1,6 +1,4 @@
 # raw/processed data and generated artifacts are versioned by DVC, not git
-data/raw/
-data/processed/
 artifacts/*
 !artifacts/.gitkeep
 # baseline_metrics.json is the one exception: regression_gate.py explicitly

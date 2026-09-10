@@ -28,6 +28,7 @@ The zip contains:
 artifacts/                  -> unpack into MLOPS/artifacts/
 mlruns/                     -> unpack into MLOPS/mlruns/
 small_split/                -> unpack into MLOPS/data/processed/small_split/
+full_gallery/               -> unpack into MLOPS/data/processed/full_gallery/
 ```
 
 On your machine, from `MLOPS/`:
@@ -38,18 +39,22 @@ cp -r /tmp/kaggle_output/artifacts/*      artifacts/
 cp -r /tmp/kaggle_output/mlruns/*         mlruns/
 mkdir -p data/processed
 cp -r /tmp/kaggle_output/small_split      data/processed/small_split
+cp -r /tmp/kaggle_output/full_gallery     data/processed/full_gallery
 ```
 
 (Or drag-and-drop the same folders in Explorer if that's easier — the
-point is just: `artifacts/`, `mlruns/`, and `data/processed/small_split/`
-need to exist locally with this content before the next step.)
+point is just: `artifacts/`, `mlruns/`, `data/processed/small_split/`, and
+`data/processed/full_gallery/` need to exist locally with this content before
+the next step.)
 
 ## 3. Finish locally
 
 Now everything in the main `MLOPS/README.md` from step 5 onward works:
 
 ```bash
-mlflow ui --backend-store-uri file:./mlruns    # see every tracked run
+mlflow server --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
+# optionally point the import/promotion step at a shared server:
+# Windows PowerShell: $env:MLFLOW_TRACKING_URI="http://<shared-server>:5000"
 python -m src.pipeline.07_evaluate             # Recall/NDCG/mAP -> artifacts/metrics.json
 python -m src.ci.regression_gate               # pass/fail gate
 python -m src.ci.champion_challenger           # A/B comparison table
