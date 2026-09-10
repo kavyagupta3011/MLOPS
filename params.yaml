@@ -11,6 +11,7 @@
 # It is NOT included in this repo (see README "Getting the dataset").
 paths:
   base_data_dir: "data/raw/DeepFashionRetrieval"     # raw dataset root
+  full_data_dir: "data/raw/DeepFashionRetrieval"
   bbox_file: "data/raw/DeepFashionRetrieval/list_bbox_inshop.txt"
   partition_file: "data/raw/DeepFashionRetrieval/list_eval_partition.txt"
   description_file: "data/raw/DeepFashionRetrieval/list_description_inshop.json"

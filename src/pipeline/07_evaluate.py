@@ -3,7 +3,7 @@ src/pipeline/07_evaluate.py — Stage 8: evaluation + regression baseline.
 
 Runs Recall@K / NDCG@K / mAP@K (same formulas as eval.py / the report's
 section 9) for every built index — Config A, both Config B alphas, and
-Config C for every (alpha, seed) pair — against the small query split.
+Config C for every (alpha, seed) pair — against the full dataset query split.
 
 To keep a small-dataset run fast, the query pipeline here fuses the query
 image embedding with its own BLIP caption (mirroring app.py's live query
@@ -61,16 +61,28 @@ def compute_metrics(retrieved_ids, gt_id, total_relevant, k_values):
     return out
 
 
-def load_query_data(query_dir, metadata):
+def load_query_data(full_data_dir, partition_file, metadata):
     query_data = []
-    for item_folder in Path(query_dir).iterdir():
-        if not item_folder.is_dir():
+    image_root = Path(full_data_dir) / "img" / "img"
+    with open(partition_file, encoding="utf-8") as partition:
+        partition_rows = partition.readlines()[2:]
+
+    for line in partition_rows:
+        if not line.strip():
             continue
-        gt_id = item_folder.name
+        image_name, gt_id, evaluation_status = line.strip().split()
+        if evaluation_status != "query":
+            continue
+
+        relative_path = Path(image_name).relative_to("img")
+        img_path = image_root / relative_path
+        if not img_path.exists():
+            continue
+
         rows = metadata[metadata["item_id"] == gt_id]
         requested_type = rows.iloc[0]["clothes_type"] if len(rows) else None
-        for img_file in sorted(item_folder.glob("*.jpg")):
-            query_data.append((str(img_file), gt_id, requested_type))
+        bbox_filename = "_".join(relative_path.parts)
+        query_data.append((str(img_path), gt_id, requested_type, bbox_filename))
     return query_data
 
 
@@ -80,12 +92,13 @@ def evaluate_index(config_name, index, query_data, metadata, clip_model, clip_pr
     gallery_id_counts = metadata["item_id"].value_counts().to_dict()
     results = {k: {"recall": [], "ndcg": [], "map": []} for k in k_values}
 
-    for img_path, gt_id, requested_type in tqdm(query_data, desc=config_name, leave=False):
+    for img_path, gt_id, requested_type, bbox_filename in tqdm(
+        query_data, desc=config_name, leave=False
+    ):
         try:
-            filename = Path(img_path).name
             cropped, _, _ = crop_with_yolo(
                 yolo_model, img_path, requested_type=requested_type,
-                bbox_map=bbox_map, item_id=gt_id, filename=filename,
+                bbox_map=bbox_map, item_id=gt_id, filename=bbox_filename,
             )
             img_emb = get_image_embedding(clip_model, clip_preprocess, cropped, device)
 
@@ -131,8 +144,7 @@ def main():
     mlflow.set_experiment(mf["experiment_name"])
 
     metadata = pd.read_csv(os.path.join(p["artifacts_dir"], "gallery_metadata.csv"))
-    query_dir = os.path.join(p["small_split_dir"], "query")
-    query_data = load_query_data(query_dir, metadata)
+    query_data = load_query_data(p["full_data_dir"], p["partition_file"], metadata)
     if e["max_queries"] and len(query_data) > e["max_queries"]:
         query_data = query_data[: e["max_queries"]]
     print(f"[evaluate] {len(query_data)} query images.")

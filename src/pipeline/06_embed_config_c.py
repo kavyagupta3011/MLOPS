@@ -62,9 +62,9 @@ def main():
         embeddings, text_embeddings = [], []
         for _, row in tqdm(manifest.iterrows(), total=len(manifest), desc=f"Re-embedding (seed {seed})"):
             item_id, rel_path = row["item_id"], row["relative_path"]
-            img_path = os.path.join(p["small_split_dir"], "gallery", rel_path)
+            img_path = os.path.join(p["full_data_dir"], "img", "img", rel_path)
             try:
-                filename = Path(rel_path).name
+                filename = "_".join(Path(rel_path).parts)
                 cropped, _, _ = crop_with_yolo(
                     yolo_model, img_path, bbox_map=bbox_map, item_id=item_id, filename=filename
                 )

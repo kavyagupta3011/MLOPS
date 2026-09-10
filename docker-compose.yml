@@ -46,7 +46,16 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./data/processed:/app/data/processed
+      - ./data/raw:/app/data/raw
+      - ${MLOPS_DATASET_HOST_PATH:-./data/raw}:/data:ro
+      - ${MLOPS_MODELS_HOST_PATH:-./pretrained_models}:/models:ro
       - ./mlflow.db:/app/mlflow.db
+    environment:
+      MLOPS_DATASET_ROOT: /data/DeepFashionRetrieval
+      MLOPS_DATASET_MODE: ${MLOPS_DATASET_MODE:-small}
+      MLOPS_YOLO_WEIGHTS: /models/yolov8n.pt
+      MLOPS_CLIP_PRETRAINED: /models/clip-vit-b-32.pt
+      MLOPS_BLIP_PRETRAINED: /models/blip-image-captioning-base
     depends_on:
       - mlflow
 
@@ -61,6 +70,15 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./data/processed:/app/data/processed
+      - ./data/raw:/app/data/raw
+      - ${MLOPS_DATASET_HOST_PATH:-./data/raw}:/data:ro
+      - ${MLOPS_MODELS_HOST_PATH:-./pretrained_models}:/models:ro
       - ./mlflow.db:/app/mlflow.db
+    environment:
+      MLOPS_DATASET_ROOT: /data/DeepFashionRetrieval
+      MLOPS_DATASET_MODE: ${MLOPS_DATASET_MODE:-small}
+      MLOPS_YOLO_WEIGHTS: /models/yolov8n.pt
+      MLOPS_CLIP_PRETRAINED: /models/clip-vit-b-32.pt
+      MLOPS_BLIP_PRETRAINED: /models/blip-image-captioning-base
     depends_on:
       - mlflow

@@ -29,7 +29,7 @@ from src.common import (build_index, fuse_embeddings, get_device,
                          get_text_embedding, load_params)
 
 BLIP_CAPTION_ID = "Salesforce/blip-image-captioning-base"
-GALLERY_ROOT_FMT = "{split_dir}/gallery/{rel_path}"
+GALLERY_ROOT_FMT = "{full_data_dir}/img/img/{rel_path}"
 
 
 def generate_caption(processor, model, pil_image, device):
@@ -59,7 +59,7 @@ def main():
 
     captions = []
     for rel_path in tqdm(manifest["relative_path"], desc="Generating captions"):
-        img_path = GALLERY_ROOT_FMT.format(split_dir=p["small_split_dir"], rel_path=rel_path)
+        img_path = GALLERY_ROOT_FMT.format(full_data_dir=p["full_data_dir"], rel_path=rel_path)
         try:
             img = Image.open(img_path).convert("RGB")
             captions.append(generate_caption(processor, model, img, device))
